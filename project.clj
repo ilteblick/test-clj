@@ -11,6 +11,7 @@
                  [fogus/ring-edn "0.2.0"]
                  [ring "1.5.0"]
                  [ring/ring-json "0.4.0"]
-                 [ring-json-response "0.2.0"]]
+                 [ring-json-response "0.2.0"]
+                 [com.cemerick/friend "0.2.3"]]
   :plugins [[lein-ring "0.6.3"]]
   :ring {:handler server.core/app})
