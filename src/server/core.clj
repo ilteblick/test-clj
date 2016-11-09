@@ -47,7 +47,7 @@
 
 (defn findUser [username] (select user (where {:username username})))
 (defn addUser [username password]
-  (insert user (values {:username username :password (creds/hash-bcrypt password)})))
+  (insert user (values {:username username :roles "user" :password (creds/hash-bcrypt password)})))
 
 
 (defn article-list []
@@ -64,6 +64,9 @@
 
 (defn insertArticle [data]
   (insert article (values {:title data})))
+
+
+
 
 
 (def page-bodies {"/login" "Login page here."
@@ -92,23 +95,22 @@
            ;; anonymous
            (GET "/" request "Landing page.")
            (POST "/lol" request (str request))
-           (GET "/login" [login_failed username] (println login_failed) (-> "public/html/index.html"
-                                (ring.util.response/file-response {:root "resources"})
-                                (ring.util.response/content-type "text/html")))
+           (GET "/login" [login_failed username]
+             (if (= login_failed "Y")  (-> "NEVERNII DANNIE" (str))
+                                (-> "public/html/index.html"
+                                    (ring.util.response/file-response {:root "resources"})
+                                    (ring.util.response/content-type "text/html")))
+             )
            (GET "/register" [] (-> "public/html/register.html"
                                 (ring.util.response/file-response {:root "resources"})
                                 (ring.util.response/content-type "text/html")))
            (friend/logout (ANY "/logout" request (ring.util.response/redirect "/"))))
 
 
-(defn new-user-validation [username]
-  (findUser username))
-
-
 (defn register [{:keys [username password]}]
   (try
     (addUser username password)
-    (workflows/make-auth {:identity username :username username})
+    (workflows/make-auth {:identity username :roles #{::user} :username username})
     (catch Exception e
       (.println System/out e)
       (json-response (str "Username address already in use"))))
@@ -121,16 +123,14 @@
       (register params))))
 
 
-
-
-(defn user-credentials [username]
-  (when-let [user (findUser username)]
-    (when-not (empty? (:password user))
-      (rename-keys user {:user :username}))))
-
 (defn credential-fn []
   (fn [auth-map]
-    (creds/bcrypt-credential-fn (partial user-credentials) auth-map)))
+    (let [user (get (findUser (:username auth-map)) 0)]
+      (if (not (= user nil))
+        (if (creds/bcrypt-verify (:password auth-map) (:password user))
+          {:identity (:id user) :roles #{::user} :user user})
+        )
+      )))
 
   (def app
   (-> compojure-handler
@@ -142,3 +142,4 @@
                             })
       site
       ))
+
