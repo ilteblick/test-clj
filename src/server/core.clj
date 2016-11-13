@@ -1,10 +1,14 @@
-(ns server.core
+(ns core
   (:require [compojure.route :as route]
             [clojure.java.io :as io]
+            [org.httpkit.server :as kit]
             [cemerick.friend :as friend]
             (cemerick.friend [workflows :as workflows]
                              [credentials :as creds])
-            [clojure.set :refer [rename-keys]]
+            [clojure.set :refer [rename-keys]
+
+             ]
+            [ring.middleware.reload :as reload]
             )
 
   (:use compojure.core
@@ -14,11 +18,8 @@
         korma.db
         korma.core
         ring.util.json-response
+        org.httpkit.server
         ))
-
-
-(defentity article)
-
 
 (def users (atom {"friend" {:username "friend"
                             :password (creds/hash-bcrypt "clojure")
@@ -67,6 +68,34 @@
 
 
 
+(defprotocol IRepository
+  ;;find all entities
+  (FindAll [this])
+  ;;find entity by id
+  (FindOne [this id])
+  ;;insert entity
+  (Insert [this entity])
+  ;;update entity
+  (Update [this id entity])
+  ;;delete entity
+  (Delete [this id])
+  )
+
+
+
+
+(defentity article)
+
+(defrecord UserRepository [] IRepository
+  (FindOne [this username] (select user (where {:username username})))
+  (Insert [this entity] (println entity)
+    (insert user (values {:username (:username entity) :roles "user" :password (creds/hash-bcrypt (:password entity))}))
+  ))
+
+(defrecord ArticleRepository [] IRepository
+  (FindAll [this] (select article))
+  )
+
 
 
 (def page-bodies {"/login" "Login page here."
@@ -82,8 +111,16 @@
            (GET "/req" request (str request))
            (GET "/private-page" request (page-bodies (:uri request))))
 
+
+(defn echo-handler [request]
+  (with-channel request channel
+                (on-close channel (fn [status] (println "chanel closed " status)))
+                (on-receive channel (fn [data] (send! channel data)))
+                ))
+
 (defroutes compojure-handler
            ;; requires user role
+
            (context "/user" request
                               (friend/wrap-authorize user-routes #{::user}))
 
@@ -93,10 +130,11 @@
                                                    "Admin page."))
 
            ;; anonymous
-           (GET "/" request "Landing page.")
-           (POST "/lol" request (str request))
+           (GET "/echo" [] echo-handler)
+           (GET "/" request  (-> request (str)))
+           (GET "/lol" request (json-response (.FindAll(ArticleRepository.))))
            (GET "/login" [login_failed username]
-             (if (= login_failed "Y")  (-> "NEVERNII DANNIE" (str))
+             (if (= login_failed "Y")  (-> "NEVERNII " (str))
                                 (-> "public/html/index.html"
                                     (ring.util.response/file-response {:root "resources"})
                                     (ring.util.response/content-type "text/html")))
@@ -109,7 +147,7 @@
 
 (defn register [{:keys [username password]}]
   (try
-    (addUser username password)
+    (.Insert (UserRepository. ) {:username username :password password})
     (workflows/make-auth {:identity username :roles #{::user} :username username})
     (catch Exception e
       (.println System/out e)
@@ -125,7 +163,7 @@
 
 (defn credential-fn []
   (fn [auth-map]
-    (let [user (get (findUser (:username auth-map)) 0)]
+    (let [user (get (.FindOne (UserRepository.) (:username auth-map))0)]
       (if (not (= user nil))
         (if (creds/bcrypt-verify (:password auth-map) (:password user))
           {:identity (:id user) :roles #{::user} :user user})
@@ -133,7 +171,7 @@
       )))
 
   (def app
-  (-> compojure-handler
+  (-> #'compojure-handler
       (friend/authenticate {
                             :login-uri "/login"
                             :credential-fn (credential-fn)
@@ -141,5 +179,10 @@
                                         (reg-workflow)]
                             })
       site
+
       ))
+
+(defn -main [& args]
+  (kit/run-server (reload/wrap-reload app) {:port 3000}))
+
 

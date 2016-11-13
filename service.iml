@@ -32,6 +32,7 @@
     <orderEntry type="library" name="Leiningen: compojure:1.1.6" level="project" />
     <orderEntry type="library" name="Leiningen: fogus/ring-edn:0.2.0" level="project" />
     <orderEntry type="library" name="Leiningen: hiccup:1.0.5" level="project" />
+    <orderEntry type="library" name="Leiningen: http-kit:2.2.0" level="project" />
     <orderEntry type="library" name="Leiningen: javax.servlet/javax.servlet-api:3.1.0" level="project" />
     <orderEntry type="library" name="Leiningen: joda-time:2.1" level="project" />
     <orderEntry type="library" name="Leiningen: korma:0.3.1" level="project" />

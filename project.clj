@@ -12,6 +12,9 @@
                  [ring "1.5.0"]
                  [ring/ring-json "0.4.0"]
                  [ring-json-response "0.2.0"]
-                 [com.cemerick/friend "0.2.3"]]
+                 [com.cemerick/friend "0.2.3"]
+                 [http-kit "2.2.0"]]
   :plugins [[lein-ring "0.6.3"]]
-  :ring {:handler server.core/app})
+  :ring {:handler server.core/app}
+  :source-paths ["src/server"]
+  :main core)
